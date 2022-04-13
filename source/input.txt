@@ -1,3 +1,1 @@
-read x,y,t;
-
-z := (x * y) + y
+z := True AND ((False OR False) AND True)

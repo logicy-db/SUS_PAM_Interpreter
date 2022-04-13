@@ -11,7 +11,7 @@ compar    :  expr RELATION expr;
 varlist       :  VARNAME (',' VARNAME)*;
 expr      :  term (WEAKOP term)*;
 term      :  elem (STRONGOP elem)*;
-elem      :  NUMBER | VARNAME | '('expr ')';
+elem      :  NUMBER | VARNAME | '(' expr ')';
 logical_expr :  logical_term (WEAKBOOL logical_term)*;
 logical_term : logical_elem (STRONGBOOL logical_elem)*;
 logical_elem : (NEG)*? (compar|BOOL|VARNAME|'(' logical_expr ')');

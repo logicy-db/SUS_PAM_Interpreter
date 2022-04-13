@@ -4,6 +4,7 @@ from gen.PAMParser import PAMParser
 from gen.PAMVisitor import PAMVisitor
 import operator
 
+
 # Visitor for PAM language.
 class CustomVisitor(PAMVisitor):
     variables = {}  # Storing the variable values
@@ -12,6 +13,13 @@ class CustomVisitor(PAMVisitor):
         '-': operator.sub,
         '*': operator.mul,
         '/': operator.truediv,
+        '<>': operator.ne,
+        '=<': operator.le,
+        '>=': operator.ge,
+        '=': operator.eq,
+        '<': operator.lt,
+        '>': operator.gt,
+        'NOT': operator.not_,
     }
 
     # Visit a parse tree produced by PAMParser#progr.
@@ -28,14 +36,13 @@ class CustomVisitor(PAMVisitor):
 
     # Visit a parse tree produced by PAMParser#input_stmt.
     def visitInput_stmt(self, ctx: PAMParser.Input_stmtContext):
-        #input_stmt: 'read' varlist;
-        varlist = self.visitChildren(ctx) #visitVarlist
+        # input_stmt: 'read' varlist;
+        varlist = self.visitChildren(ctx)  # visitVarlist
 
         data_values = open('source/data.txt', 'r').read().split(',')
         # Assumption: only positive integers are passed
         for idx, var in enumerate(varlist):
             self.variables[var] = int(data_values[idx])
-        # print(self.variables)
 
     # Visit a parse tree produced by PAMParser#output_stmt.
     def visitOutput_stmt(self, ctx: PAMParser.Output_stmtContext):
@@ -43,7 +50,8 @@ class CustomVisitor(PAMVisitor):
 
     # Visit a parse tree produced by PAMParser#assign_stmt.
     def visitAssign_stmt(self, ctx: PAMParser.Assign_stmtContext):
-        return self.visitChildren(ctx)
+        # assign_stmt : VARNAME ':=' (logical_expr|expr);
+        self.variables[str(ctx.getChild(0))] = self.visit(ctx.getChild(2))
 
     # Visit a parse tree produced by PAMParser#cond_stmt.
     def visitCond_stmt(self, ctx: PAMParser.Cond_stmtContext):
@@ -55,7 +63,11 @@ class CustomVisitor(PAMVisitor):
 
     # Visit a parse tree produced by PAMParser#compar.
     def visitCompar(self, ctx: PAMParser.ComparContext):
-        return self.visitChildren(ctx)
+        # compar : expr RELATION expr;
+        elem1 = self.visit(ctx.getChild(0))
+        elem2 = self.visit(ctx.getChild(2))
+
+        return self.ops[str(ctx.getChild(1))](elem1, elem2)
 
     # Visit a parse tree produced by PAMParser#varlist.
     def visitVarlist(self, ctx: PAMParser.VarlistContext):
@@ -70,7 +82,14 @@ class CustomVisitor(PAMVisitor):
 
     # Visit a parse tree produced by PAMParser#expr.
     def visitExpr(self, ctx: PAMParser.ExprContext):
-        return self.visitChildren(ctx)
+        # expr : term (WEAKOP term)*;
+        if ctx.getChildCount() == 1:
+            return self.visitChildren(ctx)
+
+        elem1 = self.visit(ctx.getChild(0))
+        elem2 = self.visit(ctx.getChild(2))
+
+        return round(self.ops[str(ctx.getChild(1))](elem1, elem2))
 
     # Visit a parse tree produced by PAMParser#term.
     def visitTerm(self, ctx: PAMParser.TermContext):
@@ -85,25 +104,65 @@ class CustomVisitor(PAMVisitor):
 
     # Visit a parse tree produced by PAMParser#elem.
     def visitElem(self, ctx: PAMParser.ElemContext):
-        # elem : NUMBER | VARNAME | '('expr ')';
+        # elem : NUMBER | VARNAME | '(' expr ')';
         if ctx.getChildCount() != 1:
-            return self.visitChildren(ctx)  #visitExpr
+            # if contains parenthesis
+            return self.visit(ctx.getChild(1))  # visitExpr
 
         elem = str(ctx.getChild(0))
 
-        return int(self.variables.get(elem))
+        if elem.isnumeric():
+            return int(elem)
+
+        return self.variables.get(elem)
 
     # Visit a parse tree produced by PAMParser#logical_expr.
     def visitLogical_expr(self, ctx: PAMParser.Logical_exprContext):
-        return self.visitChildren(ctx)
+        # logical_expr :  logical_term (WEAKBOOL logical_term)*;
+        if ctx.getChildCount() == 1:
+            return self.visitChildren(ctx)
+
+        elem1 = self.visit(ctx.getChild(0))
+        elem2 = self.visit(ctx.getChild(2))
+
+        return elem1 or elem2
+
 
     # Visit a parse tree produced by PAMParser#logical_term.
     def visitLogical_term(self, ctx: PAMParser.Logical_termContext):
-        return self.visitChildren(ctx)
+        # logical_term : logical_elem (STRONGBOOL logical_elem)*;
+        if ctx.getChildCount() == 1:
+            return self.visitChildren(ctx)
+
+        elem1 = self.visit(ctx.getChild(0))
+        elem2 = self.visit(ctx.getChild(2))
+
+        return elem1 and elem2
 
     # Visit a parse tree produced by PAMParser#logical_elem.
     def visitLogical_elem(self, ctx: PAMParser.Logical_elemContext):
-        return self.visitChildren(ctx)
+        # logical_elem : (NEG)*? (compar|BOOL|VARNAME|'(' logical_expr ')');
+        if ctx.getChildCount() > 1:
+            print(ctx.getText())
+            if str(ctx.getChild(0)) == 'NOT':
+                if ctx.getChildCount() == 3:
+                    # NOT without parenthesis
+                    return self.ops[str(ctx.getChild(0))](self.visitChildren(ctx))  # visitLogicalExpr
+                else:
+                    # NOT with parenthesis
+                    return self.ops[str(ctx.getChild(0))](self.visit(ctx.getChild(1)))
+            else:
+                # Just parenthesis
+                return self.visit(ctx.getChild(1))
+
+        elem = str(ctx.getChild(0))
+
+        # Converting strings to True and False
+        if eval(elem) in (True, False):
+            return eval(elem)
+
+        # Getting the value of variable
+        return self.variables.get(elem)
 
 
 del PAMParser
