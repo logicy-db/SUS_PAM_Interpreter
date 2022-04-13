@@ -1,4 +1,0 @@
-while c > a OR (y < z / a AND (True AND NOT True) AND True) OR NOT NOT False do
-    if x<y then y:=x-y
-    else x:=x-y fi
-    end

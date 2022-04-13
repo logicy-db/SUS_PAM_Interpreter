@@ -1,6 +1,7 @@
 from antlr4 import *
 from gen.PAMLexer import PAMLexer
 from gen.PAMParser import PAMParser
+from source.CustomVisitor import CustomVisitor
 from antlr4.tree.Trees import Trees
 import nltk
 
@@ -10,9 +11,15 @@ def main(filename):
     stream = CommonTokenStream(lexer)
     parser = PAMParser(stream)
     tree = parser.progr()
+    output = CustomVisitor().visit(tree)
+    print(output)
+
+    """
+    Drawing the tree (for debugging)
+    """
     treeString = Trees.toStringTree(tree, None, parser)
     tree = nltk.Tree.fromstring(treeString)
     tree.draw()
 
 if __name__ == '__main__':
-    main('source/sample.txt')
+    main('source/input.txt')
