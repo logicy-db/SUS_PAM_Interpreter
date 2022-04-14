@@ -2,6 +2,7 @@
 from antlr4 import *
 from gen.PAMParser import PAMParser
 from gen.PAMVisitor import PAMVisitor
+from antlr4.tree.Tree import TerminalNode
 import operator
 
 
@@ -52,6 +53,7 @@ class CustomVisitor(PAMVisitor):
     def visitAssign_stmt(self, ctx: PAMParser.Assign_stmtContext):
         # assign_stmt : VARNAME ':=' (logical_expr|expr);
         self.variables[str(ctx.getChild(0))] = self.visit(ctx.getChild(2))
+        print(self.variables)
 
     # Visit a parse tree produced by PAMParser#cond_stmt.
     def visitCond_stmt(self, ctx: PAMParser.Cond_stmtContext):
@@ -127,7 +129,6 @@ class CustomVisitor(PAMVisitor):
 
         return elem1 or elem2
 
-
     # Visit a parse tree produced by PAMParser#logical_term.
     def visitLogical_term(self, ctx: PAMParser.Logical_termContext):
         # logical_term : logical_elem (STRONGBOOL logical_elem)*;
@@ -143,19 +144,35 @@ class CustomVisitor(PAMVisitor):
     def visitLogical_elem(self, ctx: PAMParser.Logical_elemContext):
         # logical_elem : (NEG)*? (compar|BOOL|VARNAME|'(' logical_expr ')');
         if ctx.getChildCount() > 1:
-            print(ctx.getText())
             if str(ctx.getChild(0)) == 'NOT':
-                if ctx.getChildCount() == 3:
+                if ctx.getChildCount() == 2:
                     # NOT without parenthesis
-                    return self.ops[str(ctx.getChild(0))](self.visitChildren(ctx))  # visitLogicalExpr
+                    if isinstance(ctx.getChild(1), TerminalNode):
+                        # NOT terminal
+                        elem = str(ctx.getChild(1))
+
+                        # Converting strings to True and False
+                        if eval(elem) in (True, False):
+                            return self.ops[str(ctx.getChild(0))](eval(elem))
+                    else:
+                        return self.ops[str(ctx.getChild(0))](self.visit(ctx.getChild(1)))  # visitLogicalExpr
                 else:
                     # NOT with parenthesis
-                    return self.ops[str(ctx.getChild(0))](self.visit(ctx.getChild(1)))
+                    # Exmp: NOT (True)
+                    return self.ops[str(ctx.getChild(0))](self.visit(ctx.getChild(2)))  # visitLogicalExpr
+            elif str(ctx.getChild(0)) == '(':
+                # NOT (smth)
+                return self.visit(ctx.getChild(2))
             else:
-                # Just parenthesis
-                return self.visit(ctx.getChild(1))
+                # compar
+                return self.visitChildren(ctx)
 
-        elem = str(ctx.getChild(0))
+        if not isinstance(ctx.getChild(0), TerminalNode):
+            # comprar handling
+            elem = str(self.visitChildren(ctx))
+        else:
+            # Processing the single value that is BOOL, VARNAME
+            elem = str(ctx.getChild(0))
 
         # Converting strings to True and False
         if eval(elem) in (True, False):

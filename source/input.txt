@@ -1,1 +1,1 @@
-z := True AND ((False OR False) AND True)
+z := True AND NOT True
