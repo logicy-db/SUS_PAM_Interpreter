@@ -47,7 +47,10 @@ class CustomVisitor(PAMVisitor):
 
     # Visit a parse tree produced by PAMParser#output_stmt.
     def visitOutput_stmt(self, ctx: PAMParser.Output_stmtContext):
-        return self.visitChildren(ctx)
+        varlist = self.visitChildren(ctx)
+
+        for var, value in varlist:
+            print(var + ": " + str(self.variables[var]))
 
     # Visit a parse tree produced by PAMParser#assign_stmt.
     def visitAssign_stmt(self, ctx: PAMParser.Assign_stmtContext):
@@ -57,11 +60,19 @@ class CustomVisitor(PAMVisitor):
 
     # Visit a parse tree produced by PAMParser#cond_stmt.
     def visitCond_stmt(self, ctx: PAMParser.Cond_stmtContext):
-        return self.visitChildren(ctx)
+        # cond_stmt : 'if' (logical_expr) 'then' series ('else' series)? 'fi';
+        exeCond = self.visit(ctx.getChild(1))
+        if exeCond:
+            # if true do series
+            return self.visit(ctx.getChild(3))
+        else:
+            return self.visit(ctx.getChild(5))
 
     # Visit a parse tree produced by PAMParser#loop.
     def visitLoop(self, ctx: PAMParser.LoopContext):
-        return self.visitChildren(ctx)
+        # loop : 'while' (logical_expr) 'do' series 'end';
+        while self.visit(ctx.getChild(1)):
+            self.visit(ctx.getChild(3))
 
     # Visit a parse tree produced by PAMParser#compar.
     def visitCompar(self, ctx: PAMParser.ComparContext):

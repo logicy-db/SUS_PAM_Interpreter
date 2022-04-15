@@ -1,1 +1,1 @@
-z := True AND NOT True
+n:= 0
