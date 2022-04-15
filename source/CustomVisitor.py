@@ -9,6 +9,7 @@ import operator
 # Visitor for PAM language.
 class CustomVisitor(PAMVisitor):
     variables = {}  # Storing the variable values
+    data_values = []  # Storing data.txt values
     ops = {
         '+': operator.add,
         '-': operator.sub,
@@ -22,6 +23,11 @@ class CustomVisitor(PAMVisitor):
         '>': operator.gt,
         'NOT': operator.not_,
     }
+
+    def __init__(self):
+        self.data_values = open('source/data.txt', 'r').read().split(',')
+        for i, val in enumerate(self.data_values):
+            self.data_values[i] = int(val)
 
     # Visit a parse tree produced by PAMParser#progr.
     def visitProgr(self, ctx: PAMParser.ProgrContext):
@@ -40,17 +46,16 @@ class CustomVisitor(PAMVisitor):
         # input_stmt: 'read' varlist;
         varlist = self.visitChildren(ctx)  # visitVarlist
 
-        data_values = open('source/data.txt', 'r').read().split(',')
-        # Assumption: only positive integers are passed
-        for idx, var in enumerate(varlist):
-            self.variables[var] = int(data_values[idx])
+        for var in varlist:
+            self.variables[var] = int(self.data_values[0])
+            self.data_values.pop(0)
 
     # Visit a parse tree produced by PAMParser#output_stmt.
     def visitOutput_stmt(self, ctx: PAMParser.Output_stmtContext):
         varlist = self.visitChildren(ctx)
 
-        for var, value in varlist:
-            print(var + ": " + str(self.variables[var]))
+        for var in varlist:
+            print(var + ": " + str(self.variables.get(var)))
 
     # Visit a parse tree produced by PAMParser#assign_stmt.
     def visitAssign_stmt(self, ctx: PAMParser.Assign_stmtContext):
@@ -86,10 +91,8 @@ class CustomVisitor(PAMVisitor):
     def visitVarlist(self, ctx: PAMParser.VarlistContext):
         # varlist : VARNAME (',' VARNAME)*;
         varlist = []
-
-        for variable in [str(i) for i in ctx.getChildren()]:
-            if variable != ',':
-                varlist += variable
+        for i in range(0, ctx.getChildCount(), 2):
+            varlist.append(str(ctx.getChild(i)))
 
         return varlist
 
@@ -179,7 +182,7 @@ class CustomVisitor(PAMVisitor):
                 return self.visitChildren(ctx)
 
         if not isinstance(ctx.getChild(0), TerminalNode):
-            # comprar handling
+            # compar handling
             elem = str(self.visitChildren(ctx))
         else:
             # Processing the single value that is BOOL, VARNAME

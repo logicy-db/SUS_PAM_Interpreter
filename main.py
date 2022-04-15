@@ -11,8 +11,7 @@ def main(filename):
     stream = CommonTokenStream(lexer)
     parser = PAMParser(stream)
     tree = parser.progr()
-    output = CustomVisitor().visit(tree)
-    print(output)
+    CustomVisitor().visit(tree)
 
     """
     Drawing the tree (for debugging)
