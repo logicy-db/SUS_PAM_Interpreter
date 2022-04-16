@@ -25,21 +25,12 @@ class CustomVisitor(PAMVisitor):
     }
 
     def __init__(self):
-        self.data_values = open('source/data.txt', 'r').read().split(',')
-        for i, val in enumerate(self.data_values):
-            self.data_values[i] = int(val)
-
-    # Visit a parse tree produced by PAMParser#progr.
-    def visitProgr(self, ctx: PAMParser.ProgrContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by PAMParser#series.
-    def visitSeries(self, ctx: PAMParser.SeriesContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by PAMParser#stmt.
-    def visitStmt(self, ctx: PAMParser.StmtContext):
-        return self.visitChildren(ctx)
+        # Reading data.txt on initializing
+        read_data = open('source/data.txt', 'r').read()
+        if read_data != '': 
+            read_data = read_data.split(',')
+            for val in read_data:
+                self.data_values.append(int(val))
 
     # Visit a parse tree produced by PAMParser#input_stmt.
     def visitInput_stmt(self, ctx: PAMParser.Input_stmtContext):
@@ -61,17 +52,18 @@ class CustomVisitor(PAMVisitor):
     def visitAssign_stmt(self, ctx: PAMParser.Assign_stmtContext):
         # assign_stmt : VARNAME ':=' (logical_expr|expr);
         self.variables[str(ctx.getChild(0))] = self.visit(ctx.getChild(2))
-        print(self.variables)
 
     # Visit a parse tree produced by PAMParser#cond_stmt.
     def visitCond_stmt(self, ctx: PAMParser.Cond_stmtContext):
         # cond_stmt : 'if' (logical_expr) 'then' series ('else' series)? 'fi';
         exeCond = self.visit(ctx.getChild(1))
+
         if exeCond:
             # if true do series
             return self.visit(ctx.getChild(3))
         else:
-            return self.visit(ctx.getChild(5))
+            if ctx.getChild(5) != None:
+                return self.visit(ctx.getChild(5))
 
     # Visit a parse tree produced by PAMParser#loop.
     def visitLoop(self, ctx: PAMParser.LoopContext):
@@ -157,29 +149,45 @@ class CustomVisitor(PAMVisitor):
     # Visit a parse tree produced by PAMParser#logical_elem.
     def visitLogical_elem(self, ctx: PAMParser.Logical_elemContext):
         # logical_elem : (NEG)*? (compar|BOOL|VARNAME|'(' logical_expr ')');
-        if ctx.getChildCount() > 1:
-            if str(ctx.getChild(0)) == 'NOT':
-                if ctx.getChildCount() == 2:
-                    # NOT without parenthesis
-                    if isinstance(ctx.getChild(1), TerminalNode):
-                        # NOT terminal
-                        elem = str(ctx.getChild(1))
+        # NOT
 
-                        # Converting strings to True and False
-                        if eval(elem) in (True, False):
-                            return self.ops[str(ctx.getChild(0))](eval(elem))
-                    else:
-                        return self.ops[str(ctx.getChild(0))](self.visit(ctx.getChild(1)))  # visitLogicalExpr
+        if str(ctx.getChild(0)) == 'NOT':
+            notCounter = 0
+            for i in range(0, ctx.getChildCount()):
+                if str(ctx.getChild(i)) != 'NOT':
+                    break
                 else:
-                    # NOT with parenthesis
-                    # Exmp: NOT (True)
-                    return self.ops[str(ctx.getChild(0))](self.visit(ctx.getChild(2)))  # visitLogicalExpr
-            elif str(ctx.getChild(0)) == '(':
-                # NOT (smth)
-                return self.visit(ctx.getChild(2))
+                    notCounter += 1
+
+            if str(ctx.getChild(notCounter)) == '(': # next element after latest NOT
+                # NOT with parenthesis
+                elemPos = notCounter+1
             else:
-                # compar
-                return self.visitChildren(ctx)
+                elemPos = notCounter
+
+            if isinstance(ctx.getChild(elemPos), TerminalNode):
+                # NOT terminal
+                elem = str(ctx.getChild(elemPos))
+
+                try:
+                # Converting strings to True and False
+                    if eval(elem) in (True, False):
+                        return eval(elem) if notCounter % 2 == 0 else self.ops['NOT'](eval(elem))
+                except:
+                    # exception when trying convert VARNAMEs with eval()
+                    # just continue to get value
+                    pass
+
+                # Returning variable
+                return self.variables.get(elem) if notCounter % 2 == 0 else self.ops['NOT'](self.variables.get(elem))
+            else:
+                # NOT node
+                return self.visit(ctx.getChild(elemPos)) if notCounter % 2 == 0 else self.ops['NOT'](self.visit(ctx.getChild(elemPos)))  # visitLogicalExpr
+
+        # Parenthesis
+        if str(ctx.getChild(0)) == '(':
+            # (logical_expr)
+            return self.visit(ctx.getChild(1))
 
         if not isinstance(ctx.getChild(0), TerminalNode):
             # compar handling
@@ -188,9 +196,14 @@ class CustomVisitor(PAMVisitor):
             # Processing the single value that is BOOL, VARNAME
             elem = str(ctx.getChild(0))
 
-        # Converting strings to True and False
-        if eval(elem) in (True, False):
-            return eval(elem)
+        try:
+            # Converting strings to True and False.
+            if eval(elem) in (True, False):
+                return eval(elem)
+        except:
+            # exception when trying convert VARNAMEs with eval()
+            # just continue to get value
+            pass
 
         # Getting the value of variable
         return self.variables.get(elem)
